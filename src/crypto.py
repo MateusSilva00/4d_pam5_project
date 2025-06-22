@@ -10,6 +10,8 @@ def xor_binary(bin_str: str, key: str) -> str:
         '0110'
     """
     logger.debug(f"Performing XOR on: '{bin_str}' with key: {key}")
+
+    # Ensure both strings are of equal length
     key_repetitions = len(bin_str) // len(key) + 1
     expanded_key = (key * key_repetitions)[: len(bin_str)]
 
