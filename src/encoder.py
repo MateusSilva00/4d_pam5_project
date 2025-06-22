@@ -10,7 +10,7 @@ _BIT2LEVEL = {
 }
 
 
-def enconde_4d_pam5(bin_str: str) -> List[Tuple[int, int, int, int]]:
+def encoder_4d_pam5(bin_str: str) -> List[Tuple[int, int, int, int]]:
     padding = (8 - len(bin_str) % 8) % 8
     logger.debug(f"Padding needed: {padding} bits")
     bin_str_padded = bin_str + "0" * padding
@@ -33,6 +33,6 @@ def enconde_4d_pam5(bin_str: str) -> List[Tuple[int, int, int, int]]:
 
 if __name__ == "__main__":
     sample_bin = "1100101010110010"
-    encoded_symbols = enconde_4d_pam5(sample_bin)
+    encoded_symbols = encoder_4d_pam5(sample_bin)
     print(f"Original binary: {sample_bin}")
     print(f"Encoded symbols: {encoded_symbols}")
