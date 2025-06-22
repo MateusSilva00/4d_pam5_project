@@ -19,18 +19,19 @@ def encoder_4d_pam5(bin_str: str) -> List[Tuple[int, int, int, int]]:
     symbols = []
 
     for i in range(0, len(bin_str_padded), 8):
-        block = bin_str_padded[i:i + 8]
+        block = bin_str_padded[i : i + 8]
         logger.debug(f"Processing block: {block}")
         levels = []
 
         for j in range(0, 8, 2):
-            pair = block[j:j + 2]
+            pair = block[j : j + 2]
             logger.debug(f"Bit pair: {pair} - Level: {_BIT2LEVEL[pair]}")
             levels.append(_BIT2LEVEL[pair])
         symbols.append(tuple(levels))
-    
+
     logger.info(f"Encoded symbols: {symbols}")
     return symbols
+
 
 if __name__ == "__main__":
     sample_bin = "1100101010110010"
