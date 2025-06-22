@@ -1,312 +1,254 @@
-# src/gui/app.py
-
+import threading
 import tkinter as tk
-import tkinter.font as tkFont
-from tkinter import messagebox, ttk
+from tkinter import messagebox, scrolledtext, ttk
 
-from src.ascii_utils import text_to_binary
+from src.ascii_utils import binary_to_text, text_to_binary
+from src.client import PAM5Client
 from src.crypto import decrypt_data, encrypt_data
 from src.decoder import decoder_4d_pam5
 from src.encoder import encoder_4d_pam5
+from src.server import PAM5Server
 from src.waveform import plot_waveform
 
 
-class Pam5GUI(tk.Tk):
+class App(tk.Tk):
     def __init__(self):
         super().__init__()
-
-        self.title("Codificador 4D-PAM5 Professional")
-        self.geometry("1000x750")
-        self.configure(bg="#F8F9FA")
+        self.title("4D-PAM5 Comunicação - Host A e Host B")
+        self.geometry("1200x800")
         self.resizable(True, True)
-
-        # Configurar fontes personalizadas
-        self.title_font = tkFont.Font(family="Segoe UI", size=16, weight="bold")
-        self.label_font = tkFont.Font(family="Segoe UI", size=11, weight="normal")
-        self.button_font = tkFont.Font(family="Segoe UI", size=12, weight="bold")
+        self.client = None
+        self.server = None
+        self.server_thread = None
 
         self.create_widgets()
-        self.center_window()
-
-    def center_window(self):
-        """Centralizar a janela na tela"""
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
-        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
-        self.geometry(f"+{x}+{y}")
 
     def create_widgets(self):
-        # Configurar estilo
-        style = ttk.Style()
-        style.theme_use("clam")
-
-        # Cores personalizadas
-        style.configure(
-            "Title.TLabel",
-            font=self.title_font,
-            foreground="#2C3E50",
-            background="#F8F9FA",
-        )
-        style.configure(
-            "Custom.TEntry", fieldbackground="#FFFFFF", borderwidth=2, relief="solid"
-        )
-        style.configure(
-            "Action.TButton",
-            font=self.button_font,
-            background="#3498DB",
-            foreground="white",
-        )
-
-        # Frame principal com padding
-        main_frame = tk.Frame(self, bg="#F8F9FA")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        # Frame principal
+        main_frame = ttk.Frame(self)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Título principal
-        title_frame = tk.Frame(main_frame, bg="#F8F9FA")
-        title_frame.pack(fill="x", pady=(0, 20))
+        title_label = ttk.Label(main_frame, text="Sistema de Comunicação 4D-PAM5", 
+                              font=("Arial", 16, "bold"))
+        title_label.pack(pady=(0, 20))
 
-        title_label = ttk.Label(
-            title_frame, text="Codificador 4D-PAM5", style="Title.TLabel"
-        )
-        title_label.pack()
+        # Frame para botões
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=10)
 
-        subtitle = tk.Label(
-            title_frame,
-            text="Sistema de Modulação Digital Avançado",
-            font=("Segoe UI", 10),
-            fg="#7F8C8D",
-            bg="#F8F9FA",
-        )
-        subtitle.pack()
+        self.btn_cliente = ttk.Button(button_frame, text="HOST A (Cliente)", 
+                                    command=self.start_cliente, width=20)
+        self.btn_cliente.grid(row=0, column=0, padx=10)
 
-        # Frame de entrada com design em cards
-        input_frame = tk.LabelFrame(
-            main_frame,
-            text=" Dados de Entrada ",
-            font=self.label_font,
-            bg="#FFFFFF",
-            fg="#2C3E50",
-            relief="solid",
-            borderwidth=1,
-            padx=20,
-            pady=15,
-        )
-        input_frame.pack(fill="x", pady=(0, 15))
+        self.btn_servidor = ttk.Button(button_frame, text="HOST B (Servidor)", 
+                                     command=self.start_servidor, width=20)
+        self.btn_servidor.grid(row=0, column=1, padx=10)
 
-        # Mensagem
-        msg_frame = tk.Frame(input_frame, bg="#FFFFFF")
-        msg_frame.pack(fill="x", pady=(0, 10))
+        # Frame para área de exibição
+        display_frame = ttk.Frame(main_frame)
+        display_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        tk.Label(
-            msg_frame,
-            text="Mensagem:",
-            font=self.label_font,
-            bg="#FFFFFF",
-            fg="#2C3E50",
-        ).pack(anchor="w")
-        self.input_entry = ttk.Entry(
-            msg_frame, width=70, style="Custom.TEntry", font=("Segoe UI", 11)
-        )
-        self.input_entry.pack(fill="x", pady=(5, 0))
-        self.input_entry.insert(0, "Digite sua mensagem aqui...")
-        self.input_entry.bind("<FocusIn>", self.clear_placeholder)
-
-        # Chave
-        key_frame = tk.Frame(input_frame, bg="#FFFFFF")
-        key_frame.pack(fill="x")
-
-        tk.Label(
-            key_frame,
-            text="Chave de Criptografia:",
-            font=self.label_font,
-            bg="#FFFFFF",
-            fg="#2C3E50",
-        ).pack(anchor="w")
-        self.key_entry = ttk.Entry(
-            key_frame, width=40, style="Custom.TEntry", font=("Segoe UI", 11),
-        )
-        self.key_entry.pack(fill="x", pady=(5, 0))
-
-        # Frame de ações
-        action_frame = tk.Frame(main_frame, bg="#F8F9FA")
-        action_frame.pack(fill="x", pady=(0, 15))
-
-        # Botões com ícones
-        btn_frame = tk.Frame(action_frame, bg="#F8F9FA")
-        btn_frame.pack()
-
-        process_btn = tk.Button(
-            btn_frame,
-            text="Processar Sinal",
-            command=self.processar,
-            font=self.button_font,
-            bg="#3498DB",
-            fg="white",
-            relief="flat",
-            padx=20,
-            pady=10,
-            cursor="hand2",
-            borderwidth=0,
-        )
-        process_btn.pack(side="left", padx=(0, 10))
-        process_btn.bind("<Enter>", lambda e: process_btn.configure(bg="#2980B9"))
-        process_btn.bind("<Leave>", lambda e: process_btn.configure(bg="#3498DB"))
-
-        clear_btn = tk.Button(
-            btn_frame,
-            text="Limpar",
-            command=self.limpar,
-            font=self.button_font,
-            bg="#E74C3C",
-            fg="white",
-            relief="flat",
-            padx=20,
-            pady=10,
-            cursor="hand2",
-            borderwidth=0,
-        )
-        clear_btn.pack(side="left")
-        clear_btn.bind("<Enter>", lambda e: clear_btn.configure(bg="#C0392B"))
-        clear_btn.bind("<Leave>", lambda e: clear_btn.configure(bg="#E74C3C"))
-
-        # Frame de resultados
-        result_frame = tk.LabelFrame(
-            main_frame,
-            text=" 📊 Resultados da Análise ",
-            font=self.label_font,
-            bg="#FFFFFF",
-            fg="#2C3E50",
-            relief="solid",
-            borderwidth=1,
-            padx=15,
-            pady=10,
-        )
-        result_frame.pack(fill="both", expand=True)
-
-        # Text widget com scrollbar
-        text_frame = tk.Frame(result_frame, bg="#FFFFFF")
-        text_frame.pack(fill="both", expand=True)
-
-        self.result_text = tk.Text(
-            text_frame,
-            height=15,
-            font=("Consolas", 10),
-            bg="#FAFAFA",
-            fg="#2C3E50",
-            relief="flat",
-            borderwidth=0,
-            wrap="word",
-            padx=10,
-            pady=10,
-        )
-
-        scrollbar = ttk.Scrollbar(
-            text_frame, orient="vertical", command=self.result_text.yview
-        )
-        self.result_text.configure(yscrollcommand=scrollbar.set)
-
-        self.result_text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        # Área de exibição com scrollbar
+        self.txt_area = scrolledtext.ScrolledText(display_frame, width=140, height=35, 
+                                                font=("Consolas", 10), wrap=tk.WORD)
+        self.txt_area.pack(fill=tk.BOTH, expand=True)
 
         # Status bar
-        status_frame = tk.Frame(main_frame, bg="#34495E", height=30)
-        status_frame.pack(fill="x", pady=(10, 0))
-        status_frame.pack_propagate(False)
+        self.status_var = tk.StringVar()
+        self.status_var.set("Pronto para iniciar comunicação")
+        status_bar = ttk.Label(main_frame, textvariable=self.status_var, 
+                             relief=tk.SUNKEN, anchor=tk.W)
+        status_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
 
-        self.status_label = tk.Label(
-            status_frame,
-            text="Pronto para processar",
-            font=("Segoe UI", 9),
-            bg="#34495E",
-            fg="#FFFFFF",
-        )
-        self.status_label.pack(side="left", padx=10, pady=5)
+    def start_cliente(self):
+        self.clear_area()
+        self.status_var.set("Modo HOST A (Cliente) iniciado")
+        self.add_separator("HOST A - PROCESSO DE ENVIO")
+        self.txt_area.insert(tk.END, "HOST A iniciado - Preparando para enviar mensagem...\n\n")
+        self.cliente_window()
 
-    def clear_placeholder(self, event):
-        if self.input_entry.get() == "Digite sua mensagem aqui...":
-            self.input_entry.delete(0, tk.END)
-
-    def limpar(self):
-        self.input_entry.delete(0, tk.END)
-        self.key_entry.delete(0, tk.END)
-        self.result_text.delete(1.0, tk.END)
-        self.input_entry.insert(0, "Digite sua mensagem aqui...")
-        self.status_label.config(
-            text="✅ Campos limpos - Pronto para novo processamento"
-        )
-
-    def processar(self):
+    def start_servidor(self):
+        self.clear_area()
+        self.status_var.set("Modo HOST B (Servidor) iniciado - Aguardando conexão...")
+        self.add_separator("HOST B - PROCESSO DE RECEPÇÃO")
+        self.txt_area.insert(tk.END, "HOST B iniciado - Aguardando mensagem do HOST A...\n\n")
+        
         try:
-            self.status_label.config(text="⏳ Processando...")
-            self.update()
+            self.server = PAM5Server()
+            self.server_thread = threading.Thread(
+                target=lambda: self.server.start(
+                    host="127.0.0.1", port=12345, message_callback=self.server_callback
+                ),
+                daemon=True,
+            )
+            self.server_thread.start()
+            self.txt_area.insert(tk.END, "✓ Servidor ativo na porta 12345\n")
+            self.txt_area.insert(tk.END, "✓ Aguardando conexão do HOST A...\n\n")
+        except Exception as e:
+            self.txt_area.insert(tk.END, f"✗ Erro ao iniciar servidor: {e}\n")
 
-            msg = self.input_entry.get()
-            key = self.key_entry.get()
+    def cliente_window(self):
+        win = tk.Toplevel(self)
+        win.title("HOST A - Enviar Mensagem")
+        win.geometry("500x300")
+        win.resizable(False, False)
+        win.grab_set()  # Modal window
 
-            if not msg or not key or msg == "Digite sua mensagem aqui...":
-                messagebox.showwarning(
-                    "⚠️ Aviso",
-                    "Por favor, preencha a mensagem e a chave de criptografia.",
-                )
-                self.status_label.config(
-                    text="❌ Erro: Campos obrigatórios não preenchidos"
-                )
+        # Frame principal
+        main_frame = ttk.Frame(win)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Mensagem
+        ttk.Label(main_frame, text="Digite a mensagem:", font=("Arial", 11)).pack(anchor="w", pady=(0,5))
+        entry_msg = tk.Entry(main_frame, width=60, font=("Arial", 11))
+        entry_msg.pack(pady=(0,15))
+        entry_msg.focus()
+
+        # Chave
+        ttk.Label(main_frame, text="Digite a chave de criptografia:", font=("Arial", 11)).pack(anchor="w", pady=(0,5))
+        entry_key = tk.Entry(main_frame, width=40, font=("Arial", 11), show="*")
+        entry_key.pack(pady=(0,20))
+
+        # Botões
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack()
+
+        def enviar():
+            msg = entry_msg.get().strip()
+            key = entry_key.get().strip()
+            if not msg or not key:
+                messagebox.showerror("Erro", "Preencha a mensagem e a chave de criptografia.")
                 return
+            self.processar_cliente(msg, key)
+            win.destroy()
 
-            # Processamento
-            encrypted_bin = encrypt_data(msg, key)
-            symbols = encoder_4d_pam5(encrypted_bin)
+        def cancelar():
+            win.destroy()
+
+        ttk.Button(button_frame, text="Enviar", command=enviar, width=15).pack(side=tk.LEFT, padx=(0,10))
+        ttk.Button(button_frame, text="Cancelar", command=cancelar, width=15).pack(side=tk.LEFT)
+
+        # Bind Enter key
+        win.bind('<Return>', lambda e: enviar())
+
+    def processar_cliente(self, msg, key):
+        self.txt_area.insert(tk.END, "ETAPA 1: Digitação do texto\n")
+        self.txt_area.insert(tk.END, f"→ Mensagem original: '{msg}'\n")
+        self.txt_area.insert(tk.END, f"→ Tamanho: {len(msg)} caracteres\n\n")
+
+        # Transformação em binário (antes da criptografia)
+        self.txt_area.insert(tk.END, "ETAPA 2: Transformação em binário\n")
+        binario_original = text_to_binary(msg)
+        self.txt_area.insert(tk.END, f"→ Binário original: {binario_original}\n")
+        self.txt_area.insert(tk.END, f"→ Tamanho: {len(binario_original)} bits\n\n")
+
+        # Criptografia
+        self.txt_area.insert(tk.END, "ETAPA 3: Aplicação do algoritmo de criptografia\n")
+        self.txt_area.insert(tk.END, f"→ Chave utilizada: '{key}'\n")
+        encrypted_bin = encrypt_data(msg, key)
+        self.txt_area.insert(tk.END, f"→ Mensagem criptografada (binário): {encrypted_bin}\n")
+        self.txt_area.insert(tk.END, f"→ Tamanho após criptografia: {len(encrypted_bin)} bits\n\n")
+
+        # Codificação 4D-PAM5
+        self.txt_area.insert(tk.END, "ETAPA 4: Aplicação do algoritmo de codificação de linha (4D-PAM5)\n")
+        symbols = encoder_4d_pam5(encrypted_bin)
+        self.txt_area.insert(tk.END, f"→ Símbolos 4D-PAM5 gerados: {symbols}\n")
+        self.txt_area.insert(tk.END, f"→ Número de símbolos: {len(symbols)}\n")
+        self.txt_area.insert(tk.END, f"→ Cada símbolo: (nível1, nível2, nível3, nível4)\n")
+        self.txt_area.insert(tk.END, f"→ Níveis possíveis: -2, -1, +1, +2\n\n")
+
+        # Gráfico
+        self.txt_area.insert(tk.END, "ETAPA 5: Apresentação do gráfico da forma de onda\n")
+        self.txt_area.insert(tk.END, "→ Gerando gráfico da forma de onda 4D-PAM5...\n")
+        plot_waveform(symbols, title="HOST A - Sinal 4D-PAM5 (Processo de Montagem)")
+        self.txt_area.insert(tk.END, "✓ Gráfico exibido com sucesso!\n\n")
+
+        # Envio
+        self.txt_area.insert(tk.END, "ETAPA 6: Envio para o HOST B\n")
+        try:
+            self.client = PAM5Client()
+            self.client.connect("127.0.0.1", 12345)
+            data = {
+                "symbols": symbols, 
+                "key": key, 
+                "original_length": len(encrypted_bin),
+                "original_message": msg
+            }
+            self.client.send_data(data)
+            self.txt_area.insert(tk.END, "✓ Mensagem enviada ao HOST B com sucesso!\n")
+            self.txt_area.insert(tk.END, "→ Aguardando processamento no HOST B...\n\n")
+            self.client.disconnect()
+            self.status_var.set("Mensagem enviada com sucesso - Aguardando HOST B processar")
+        except Exception as e:
+            self.txt_area.insert(tk.END, f"✗ Erro ao enviar para HOST B: {e}\n")
+            self.txt_area.insert(tk.END, "→ Verifique se o HOST B está ativo\n\n")
+            self.status_var.set("Erro no envio - Verifique conexão")
+
+    def server_callback(self, data):
+        try:
+            # Recepção
+            symbols = data["symbols"]
+            key = data["key"]
+            original_length = data.get("original_length", len(symbols) * 8)
+            
+            self.txt_area.insert(tk.END, "="*80 + "\n")
+            self.txt_area.insert(tk.END, "RECEPÇÃO NO HOST B - PROCESSAMENTO INICIADO\n")
+            self.txt_area.insert(tk.END, "="*80 + "\n\n")
+
+            # Etapa 1: Recepção
+            self.txt_area.insert(tk.END, "ETAPA 1: Recepção dos dados\n")
+            self.txt_area.insert(tk.END, f"✓ Símbolos recebidos do HOST A: {symbols}\n")
+            self.txt_area.insert(tk.END, f"→ Número de símbolos: {len(symbols)}\n")
+            self.txt_area.insert(tk.END, f"→ Chave recebida: '{key}'\n\n")
+
+            # Etapa 2: Apresentar gráfico
+            self.txt_area.insert(tk.END, "ETAPA 2: Apresentação do gráfico da forma de onda recebida\n")
+            self.txt_area.insert(tk.END, "→ Gerando gráfico da forma de onda recebida...\n")
+            plot_waveform(symbols, title="HOST B - Sinal 4D-PAM5 (Processo Inverso)")
+            self.txt_area.insert(tk.END, "✓ Gráfico da recepção exibido com sucesso!\n\n")
+
+            # Etapa 3: Decodificação 4D-PAM5
+            self.txt_area.insert(tk.END, "ETAPA 3: Aplicação do algoritmo de codificação de linha (modo inverso)\n")
             recovered_bin = decoder_4d_pam5(symbols)
-            decrypted_msg = decrypt_data(recovered_bin[: len(encrypted_bin)], key)
+            self.txt_area.insert(tk.END, f"→ Binário decodificado: {recovered_bin[:original_length]}\n")
+            self.txt_area.insert(tk.END, f"→ Tamanho: {len(recovered_bin[:original_length])} bits\n\n")
 
-            # Exibir resultados formatados
-            self.result_text.delete(1.0, tk.END)
+            # Etapa 4: Descriptografia
+            self.txt_area.insert(tk.END, "ETAPA 4: Aplicação do algoritmo de criptografia (modo inverso)\n")
+            decrypted_msg = decrypt_data(recovered_bin[:original_length], key)
+            self.txt_area.insert(tk.END, f"→ Mensagem descriptografada: '{decrypted_msg}'\n\n")
 
-            results = f"""
-║                           ANÁLISE DO SINAL 4D-PAM5                            ║
+            # Etapa 5: Transformação para ASCII
+            self.txt_area.insert(tk.END, "ETAPA 5: Transformação de binário para ASCII\n")
+            self.txt_area.insert(tk.END, f"→ Texto final em ASCII: '{decrypted_msg}'\n\n")
 
-📝 DADOS DE ENTRADA:
-   └─ Mensagem Original: "{msg}"
-   └─ Chave de Criptografia: {"*" * len(key)}
-   └─ Tamanho da Mensagem: {len(msg)} caracteres
-
-🔢 REPRESENTAÇÃO BINÁRIA:
-   └─ Binário Original: {text_to_binary(msg)}
-   └─ Tamanho: {len(text_to_binary(msg))} bits
-
-🔐 CRIPTOGRAFIA:
-   └─ Binário Criptografado: {encrypted_bin}
-   └─ Tamanho: {len(encrypted_bin)} bits
-
-📡 CODIFICAÇÃO 4D-PAM5:
-   └─ Símbolos Gerados: {len(symbols)}
-   └─ Representação: {symbols}
-   └─ Total de Níveis: {len(symbols) * 4}
-
-🔄 DECODIFICAÇÃO:
-   └─ Binário Recuperado: {recovered_bin}
-   └─ Tamanho Recuperado: {len(recovered_bin)} bits
-
-✅ RESULTADO FINAL:
-   └─ Mensagem Decodificada: "{decrypted_msg}"
-   └─ Integridade: {"✅ PERFEITA"}
-
-"""
-
-            self.result_text.insert(tk.END, results)
-
-            # Exibir forma de onda
-            plot_waveform(symbols, title=f'Sinal 4D-PAM5 - "{msg}"')
-
-            self.status_label.config(text="Processamento concluído com sucesso!")
+            # Etapa 6: Resultado final
+            self.txt_area.insert(tk.END, "ETAPA 6: Mensagem final\n")
+            self.txt_area.insert(tk.END, f"✓ MENSAGEM RECEBIDA COM SUCESSO: '{decrypted_msg}'\n\n")
+            
+            self.add_separator("COMUNICAÇÃO FINALIZADA COM SUCESSO")
+            self.status_var.set("Comunicação HOST A → HOST B finalizada com sucesso")
 
         except Exception as e:
-            messagebox.showerror(
-                "❌Erro", f"Ocorreu um erro durante o processamento:\n\n{str(e)}"
-            )
-            self.status_label.config(text="❌ Erro no processamento")
+            self.txt_area.insert(tk.END, f"✗ Erro no processamento HOST B: {e}\n")
+            self.status_var.set("Erro no processamento HOST B")
 
+    def add_separator(self, title=""):
+        self.txt_area.insert(tk.END, "="*80 + "\n")
+        if title:
+            self.txt_area.insert(tk.END, f"{title:^80}\n")
+            self.txt_area.insert(tk.END, "="*80 + "\n")
+
+    def clear_area(self):
+        self.txt_area.delete("1.0", tk.END)
+
+    def on_closing(self):
+        if self.server:
+            self.server.stop()
+        self.destroy()
 
 if __name__ == "__main__":
-    app = Pam5GUI()
+    app = App()
+    app.protocol("WM_DELETE_WINDOW", app.on_closing)
     app.mainloop()
