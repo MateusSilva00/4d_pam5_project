@@ -14,7 +14,7 @@ def encoder_4d_pam5(bin_str: str) -> List[Tuple[int, int, int, int]]:
     padding = (8 - len(bin_str) % 8) % 8
     logger.debug(f"Padding needed: {padding} bits")
     bin_str_padded = bin_str + "0" * padding
-    logger.debug(f"Padded binary string: {bin_str_padded}")
+    logger.info(f"Padded binary string: {bin_str_padded}")
 
     symbols = []
 
@@ -29,6 +29,7 @@ def encoder_4d_pam5(bin_str: str) -> List[Tuple[int, int, int, int]]:
             levels.append(_BIT2LEVEL[pair])
         symbols.append(tuple(levels))
     
+    logger.info(f"Encoded symbols: {symbols}")
     return symbols
 
 if __name__ == "__main__":
