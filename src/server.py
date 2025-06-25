@@ -11,7 +11,7 @@ class PAM5Server:
         self.running = False
         self.clients = []
 
-    def start(self, host="127.0.0.1", port=12345, message_callback=None):
+    def start(self, host="0.0.0.0", port=5225, message_callback=None):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

@@ -78,12 +78,12 @@ class App(tk.Tk):
             self.server = PAM5Server()
             self.server_thread = threading.Thread(
                 target=lambda: self.server.start(
-                    host="127.0.0.1", port=12345, message_callback=self.server_callback
+                    host="0.0.0.0", port=5225, message_callback=self.server_callback
                 ),
                 daemon=True,
             )
             self.server_thread.start()
-            self.txt_area.insert(tk.END, "✓ Servidor ativo na porta 12345\n")
+            self.txt_area.insert(tk.END, "✓ Servidor ativo na porta 5225\n")
             self.txt_area.insert(tk.END, "✓ Aguardando conexão do HOST A...\n\n")
         except Exception as e:
             self.txt_area.insert(tk.END, f"✗ Erro ao iniciar servidor: {e}\n")
@@ -168,7 +168,7 @@ class App(tk.Tk):
         self.txt_area.insert(tk.END, "ETAPA 6: Envio para o HOST B\n")
         try:
             self.client = PAM5Client()
-            self.client.connect("127.0.0.1", 12345)
+            self.client.connect("127.0.0.1", 5225)
             data = {
                 "symbols": symbols, 
                 "key": key, 
