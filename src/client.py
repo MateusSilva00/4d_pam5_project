@@ -9,7 +9,7 @@ class PAM5Client:
         self.socket = None
         self.connected = False
 
-    def connect(self, host: str = "0.0.0.0", port: int = 5225):
+    def connect(self, host: str = "192.168.15.4", port: int = 5225): #IP de destino
         """Connect to the PAM5 server."""
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

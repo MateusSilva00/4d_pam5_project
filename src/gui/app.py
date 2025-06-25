@@ -168,7 +168,7 @@ class App(tk.Tk):
         self.txt_area.insert(tk.END, "ETAPA 6: Envio para o HOST B\n")
         try:
             self.client = PAM5Client()
-            self.client.connect("127.0.0.1", 5225)
+            self.client.connect("192.168.15.4", 5225) #IP de destino
             data = {
                 "symbols": symbols, 
                 "key": key, 
