@@ -10,6 +10,16 @@ This project implements a simple communication system using the 4D-PAM5 line cod
 - **Waveform visualization** for both sending and receiving sides
 - **Graphical interface** using Tkinter
 
+## Screenshots
+
+### Main Interface
+![Main Interface](imgs/interface.jpeg)
+*Main application interface showing the communication system with Host A (Client) and Host B (Server) options. The interface displays the complete communication process including text digitization, binary transformation, cryptography application, 4D-PAM5 line coding, and waveform presentation.*
+
+### 4D-PAM5 Waveform Visualization
+![4D-PAM5 Waveform](imgs/generate_graph.jpeg)
+*4D-PAM5 signal waveform visualization showing the encoding process. The graph displays 11 symbols over 5 levels with a total duration of 11 seconds, demonstrating the multilevel pulse amplitude modulation used in the communication system.*
+
 ## Requirements
 
 - Python 3.8+
@@ -57,4 +67,4 @@ You can also open two instances of the program to simulate client and server in 
 
 ## License
 
-For academic use in the
+For academic use in the Data Communication course.
