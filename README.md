@@ -27,8 +27,7 @@ This project implements a simple communication system using the 4D-PAM5 line cod
    ```bash
    uv venv
    source .venv/bin/activate
-   uv pip install -r requirements.txt
-   uv sync
+   uv sync --all-groups
    ```
 
 ## How to Run
